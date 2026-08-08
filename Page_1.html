@@ -80,35 +80,34 @@
             border: 5px solid var(--line);
             border-radius: 130px 130px 16px 16px;
             overflow: hidden;
-            background: radial-gradient(circle at 72% 36%, rgba(255, 245, 205, .95), transparent 33%), linear-gradient(160deg, #cda98d, #8b674f)
+            background: #ffffff;
         }
 
         /* 半开门：Puff_lean.png。
-           作为 .scene 的直属图层。图层顺序按需求设置为：
-           门板在上，Puff_lean 居中，门框在下。 */
+           图层位于 door 与 frame 之间；图片尺寸与 Puff_inside 统一为 230px。
+           动画终点不完全进入，只露出约半个头。 */
         .puff-peek {
             position: absolute;
-            left: 174px;
-            top: 220px;
-            width: 142px;
-            height: 118px;
+            left: 202px;
+            top: 250px;
+            width: 83px;
+            height: 132px;
             overflow: hidden;
-            z-index: 5;
+            z-index: 3;
             opacity: 0;
-            transform: translateX(-88px);
-            clip-path: inset(0 0 0 100%);
+            transform: translateX(-48px);
             animation: peek 5s ease-in-out infinite;
             pointer-events: none;
         }
 
         .puff-peek-img {
             position: absolute;
-            width: 300px;
+            width: 230px;
             max-width: none;
-            left: -94px;
-            top: -55px;
+            left: -110px;
+            top: -48px;
             display: block;
-            transform: rotate(20deg);
+            transform: rotate(28deg);
             transform-origin: center center;
         }
 
@@ -121,19 +120,20 @@
             height: 382px;
             overflow: hidden;
             border-radius: 130px 130px 16px 16px;
-            z-index: 2;
+            z-index: 3;
             opacity: 0;
             visibility: hidden;
+            transform: translateX(-42px);
             pointer-events: none;
+            will-change: transform, opacity;
         }
 
         .puff-open-img {
             position: absolute;
-            width: 290px;
+            width: 230px;
             max-width: none;
-            left: -20px;
-            top: 6px;
-            transform: translateY(48%);
+            left: 9px;
+            bottom: 0;
             display: block;
         }
 
@@ -143,7 +143,7 @@
             top: 30px;
             width: 238px;
             height: 372px;
-            z-index: 6;
+            z-index: 4;
             transform-origin: left center;
             border: 5px solid var(--line);
             border-radius: 122px 122px 13px 13px;
@@ -178,7 +178,7 @@
             border-radius: 155px 155px 20px 20px;
             box-shadow: inset 0 0 0 13px var(--frame), inset 0 0 0 18px var(--line);
             pointer-events: none;
-            z-index: 4
+            z-index: 2
         }
 
         .hint {
@@ -217,7 +217,7 @@
 
             8%,
             50% {
-                transform: perspective(900px) rotateY(-18deg)
+                transform: perspective(900px) rotateY(-15deg)
             }
 
             60%,
@@ -231,22 +231,19 @@
             0%,
             8% {
                 opacity: 0;
-                transform: translateX(-88px);
-                clip-path: inset(0 0 0 100%)
+                transform: translateX(-48px)
             }
 
             18%,
             50% {
                 opacity: 1;
-                transform: translateX(0);
-                clip-path: inset(0 0 0 50%)
+                transform: translateX(19.5px)
             }
 
             60%,
             100% {
                 opacity: 0;
-                transform: translateX(-88px);
-                clip-path: inset(0 0 0 100%)
+                transform: translateX(-48px)
             }
         }
 
@@ -259,15 +256,15 @@
         .scene.open .puff-peek {
             animation: none;
             opacity: 0;
-            transform: translateX(-28px);
-            clip-path: inset(0 0 0 100%);
-            transition: opacity .15s ease, transform .2s ease, clip-path .2s ease;
+            transform: translateX(-32px);
+            transition: opacity .15s ease, transform .2s ease;
         }
 
         .scene.open .puff-open {
             visibility: visible;
             opacity: 1;
-            transition: none;
+            transform: translateX(0);
+            transition: opacity .25s ease .32s, transform .55s cubic-bezier(.22, .75, .18, 1) .32s;
         }
 @media(max-width:430px) {
             .scene {
@@ -289,8 +286,7 @@
 
             .puff-peek {
                 opacity: 1;
-                transform: none;
-                clip-path: inset(0 0 0 50%)
+                transform: translateX(-8px)
             }
 
             .hint {
@@ -324,7 +320,53 @@
         </section>
     </main>
     <script>
-        const scene = document.getElementById('scene'), hint = document.getElementById('hint'), page = document.getElementById('page'); let opening = false; setTimeout(() => hint.classList.add('show'), 10000); function openDoor() { if (opening) return; opening = true; hint.classList.add('show'); scene.classList.add('open'); setTimeout(() => page.classList.add('leaving'), 2200); setTimeout(() => location.href = 'page2.html', 2900) } scene.addEventListener('click', openDoor); scene.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDoor() } });
+        const scene = document.getElementById('scene');
+        const hint = document.getElementById('hint');
+        const page = document.getElementById('page');
+        const door = scene.querySelector('.door');
+        let opening = false;
+
+        setTimeout(() => hint.classList.add('show'), 10000);
+
+        function openDoor() {
+            if (opening) return;
+            opening = true;
+            hint.classList.add('show');
+
+            // 先读取点击瞬间门的真实视觉状态。
+            const currentTransform = getComputedStyle(door).transform;
+
+            // 停掉循环半开动画，并把点击瞬间的状态固定为新的起点。
+            door.style.animation = 'none';
+            door.style.transition = 'none';
+            door.style.transform = currentTransform === 'none'
+                ? 'perspective(900px) rotateY(0deg)'
+                : currentTransform;
+
+            // 让浏览器真正提交上面的“起点”。
+            void door.offsetWidth;
+
+            // .open 只负责切换 Puff_lean / Puff_inside 等状态。
+            scene.classList.add('open');
+
+            // 门本身由 inline transition 从当前角度继续开到 -72deg。
+            door.style.transition = 'transform .9s cubic-bezier(.22, .75, .18, 1)';
+
+            requestAnimationFrame(() => {
+                door.style.transform = 'perspective(900px) rotateY(-72deg)';
+            });
+
+            setTimeout(() => page.classList.add('leaving'), 2200);
+            setTimeout(() => location.href = 'page2.html', 2900);
+        }
+
+        scene.addEventListener('click', openDoor);
+        scene.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openDoor();
+            }
+        });
     </script>
 </body>
 
