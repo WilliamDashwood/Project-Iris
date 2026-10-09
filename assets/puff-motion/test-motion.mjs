@@ -34,6 +34,8 @@ function harness(reducedMotion=false){
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 const h=harness();await flush();assert.equal(h.nodes['[data-play]'].disabled,false);
+assert.equal(h.nodes['[data-actor]'].children.length,15);
+for(const image of h.nodes['[data-actor]'].children)assert(image.attrs.href.endsWith('?v=20261009-hind-v2'),'All pose URLs must use the current asset revision');
 h.step(50);h.step(49);h.step(NaN);
 h.nodes['[data-play]'].listeners.click();assert.equal(h.pending.size,1,'Replay must cancel the previous frame');
 h.step(0);h.step(1920);h.step(2300);assert.equal(h.root.dataset.phase,'2');

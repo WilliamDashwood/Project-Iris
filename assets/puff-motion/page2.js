@@ -1,5 +1,5 @@
-import { POSES } from './poses.js';
-import { MOTION, PHASES, sampleMotion } from './motion-core.js';
+import { POSES } from './poses.js?v=20261009-hind-v2';
+import { MOTION, PHASES, sampleMotion } from './motion-core.js?v=20261009-hind-v2';
 
 const root=document.getElementById('puff-room');
 const find=s=>root.querySelector(s);
@@ -12,7 +12,7 @@ const assets=new Map();
 const svgNS='http://www.w3.org/2000/svg';
 for(const pose of POSES){
   const node=document.createElementNS(svgNS,'image');
-  const url=new URL(`./${pose.id}.png`,import.meta.url).href;
+  const url=new URL(`./${pose.id}.png?v=20261009-hind-v2`,import.meta.url).href;
   node.setAttribute('href',url);node.setAttribute('width',MOTION.size);node.setAttribute('height',MOTION.size);
   node.setAttribute('x',-pose.nose[0]*scale);node.setAttribute('y',-pose.nose[1]*scale);
   node.style.visibility='hidden';actor.appendChild(node);assets.set(pose.id,{node,url});

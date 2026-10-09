@@ -1,4 +1,4 @@
-import { POSES, WALK } from './poses.js';
+import { POSES, WALK } from './poses.js?v=20261009-hind-v2';
 
 export const MOTION = Object.freeze({
   duration:3700,walkEnd:1920,crouchEnd:2180,land:3160,recover:3340,
