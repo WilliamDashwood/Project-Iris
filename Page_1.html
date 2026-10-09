@@ -11,7 +11,11 @@
             --line: #6f4c38;
             --door: #ead2bd;
             --frame: #d7b398;
-            --ink: #8a6954
+            --ink: #8a6954;
+            --puff-swap-duration: .2s;
+            --puff-swap-delay: .12s;
+            --door-open-duration: .9s;
+            --door-open-easing: cubic-bezier(.22, .75, .18, 1)
         }
 
         * {
@@ -103,6 +107,7 @@
         .puff-peek-img {
             position: absolute;
             width: 230px;
+            aspect-ratio: 1;
             max-width: none;
             left: -110px;
             top: -48px;
@@ -123,14 +128,15 @@
             z-index: 3;
             opacity: 0;
             visibility: hidden;
-            transform: translateX(-42px);
+            transform: none;
             pointer-events: none;
-            will-change: transform, opacity;
+            will-change: opacity;
         }
 
         .puff-open-img {
             position: absolute;
             width: 250px;
+            aspect-ratio: 1;
             max-width: none;
             left: 9px;
             bottom: -2px;
@@ -249,22 +255,21 @@
 
         .scene.open .door {
             animation: none;
-            transition: transform .9s cubic-bezier(.22, .75, .18, 1);
+            transition: transform var(--door-open-duration) var(--door-open-easing);
             transform: perspective(900px) rotateY(-72deg)
         }
 
         .scene.open .puff-peek {
             animation: none;
             opacity: 0;
-            transform: translateX(-32px);
-            transition: opacity .15s ease, transform .2s ease;
+            transition: opacity var(--puff-swap-duration) ease var(--puff-swap-delay);
         }
 
         .scene.open .puff-open {
             visibility: visible;
             opacity: 1;
-            transform: translateX(0);
-            transition: opacity .25s ease .32s, transform .55s cubic-bezier(.22, .75, .18, 1) .32s;
+            transform: none;
+            transition: opacity var(--puff-swap-duration) ease var(--puff-swap-delay);
         }
 @media(max-width:430px) {
             .scene {
@@ -292,6 +297,20 @@
             .hint {
                 opacity: 1;
                 transform: none
+            }
+
+            .scene.open .door,
+            .scene.open .puff-peek,
+            .scene.open .puff-open {
+                transition: none !important;
+            }
+
+            .page {
+                transition: none;
+            }
+
+            .page.leaving {
+                transform: none;
             }
         }
     </style>
@@ -324,9 +343,47 @@
         const hint = document.getElementById('hint');
         const page = document.getElementById('page');
         const door = scene.querySelector('.door');
+        const puffPeek = scene.querySelector('.puff-peek');
+        const puffPeekImg = scene.querySelector('.puff-peek-img');
+        const puffOpen = scene.querySelector('.puff-open');
+        const puffOpenImg = scene.querySelector('.puff-open-img');
+        // 两张 1024px 素材中的鼻子中心，用于保持换姿势时的视觉位置。
+        const PUFF_ANCHORS = {
+            canvasSize: 1024,
+            lean: { x: 466.66, y: 395.14 },
+            inside: { x: 478.37, y: 452.11 }
+        };
+        const PAGE_TIMING = { hint: 10000, leave: 2200, navigate: 2900 };
         let opening = false;
 
-        setTimeout(() => hint.classList.add('show'), 10000);
+        setTimeout(() => hint.classList.add('show'), PAGE_TIMING.hint);
+
+        function pinPuffPosition() {
+            const peekStyle = getComputedStyle(puffPeek);
+            const peekTransform = peekStyle.transform;
+            const peekOpacity = peekStyle.opacity;
+            const peekMatrix = new DOMMatrixReadOnly(peekTransform === 'none' ? undefined : peekTransform);
+            const imageStyle = getComputedStyle(puffPeekImg);
+            const imageMatrix = new DOMMatrixReadOnly(imageStyle.transform === 'none' ? undefined : imageStyle.transform);
+            const [originX, originY] = imageStyle.transformOrigin.split(' ').map(parseFloat);
+            const leanScale = puffPeekImg.offsetWidth / PUFF_ANCHORS.canvasSize;
+            const nose = imageMatrix.transformPoint(new DOMPoint(
+                PUFF_ANCHORS.lean.x * leanScale - originX,
+                PUFF_ANCHORS.lean.y * leanScale - originY
+            ));
+            // 使用场景内坐标，手机上 .scene 的缩放不会影响对齐。
+            const noseX = puffPeek.offsetLeft + peekMatrix.m41 + puffPeekImg.offsetLeft + originX + nose.x;
+            const noseY = puffPeek.offsetTop + peekMatrix.m42 + puffPeekImg.offsetTop + originY + nose.y;
+            const insideScale = puffOpenImg.offsetWidth / PUFF_ANCHORS.canvasSize;
+            puffOpenImg.style.left = `${noseX - puffOpen.offsetLeft - PUFF_ANCHORS.inside.x * insideScale}px`;
+            puffOpenImg.style.top = `${noseY - puffOpen.offsetTop - PUFF_ANCHORS.inside.y * insideScale}px`;
+            puffOpenImg.style.bottom = 'auto';
+
+            // 停在点击瞬间，不让探头层在淡出时继续向左缩回。
+            puffPeek.style.transform = peekTransform;
+            puffPeek.style.opacity = peekOpacity;
+            puffPeek.style.animation = 'none';
+        }
 
         function openDoor() {
             if (opening) return;
@@ -335,6 +392,7 @@
 
             // 先读取点击瞬间门的真实视觉状态。
             const currentTransform = getComputedStyle(door).transform;
+            pinPuffPosition();
 
             // 停掉循环半开动画，并把点击瞬间的状态固定为新的起点。
             door.style.animation = 'none';
@@ -346,18 +404,19 @@
             // 让浏览器真正提交上面的“起点”。
             void door.offsetWidth;
 
-            // .open 只负责切换 Puff_lean / Puff_inside 等状态。
+            // 两种姿势在同一鼻子位置交叉淡化，门独立继续打开。
             scene.classList.add('open');
+            puffPeek.style.opacity = '0';
 
             // 门本身由 inline transition 从当前角度继续开到 -72deg。
-            door.style.transition = 'transform .9s cubic-bezier(.22, .75, .18, 1)';
+            door.style.transition = 'transform var(--door-open-duration) var(--door-open-easing)';
 
             requestAnimationFrame(() => {
                 door.style.transform = 'perspective(900px) rotateY(-72deg)';
             });
 
-            setTimeout(() => page.classList.add('leaving'), 2200);
-            setTimeout(() => location.href = 'page2.html', 2900);
+            setTimeout(() => page.classList.add('leaving'), PAGE_TIMING.leave);
+            setTimeout(() => location.href = 'page2.html', PAGE_TIMING.navigate);
         }
 
         scene.addEventListener('click', openDoor);
